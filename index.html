@@ -695,6 +695,9 @@ const KEY_REMOVED = 'jctsm_removed';
 const KEY_GH = 'jctsm_gh';
 const KEY_DEVICE = 'jctsm_device';
 
+/* 私有数据仓库的默认值，直接预填进同步设置，省得每次手打 */
+const DEFAULT_GH_REPO = 'yongshenglu/meal-data';
+
 function readStore(key, fallback) {
   try {
     const raw = localStorage.getItem(key);
@@ -1840,7 +1843,8 @@ document.addEventListener('DOMContentLoaded', function () {
   const repoEl = document.getElementById('gh-repo');
   const tokenEl = document.getElementById('gh-token');
   if (repoEl) {
-    repoEl.value = gh.repo;
+    // 从没填过就用默认的私有仓库名，填过则以保存的为准
+    repoEl.value = gh.repo || DEFAULT_GH_REPO;
     repoEl.addEventListener('change', saveGhFromForm);
     repoEl.addEventListener('blur', saveGhFromForm);
   }
