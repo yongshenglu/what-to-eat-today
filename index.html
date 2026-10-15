@@ -1869,10 +1869,10 @@ document.addEventListener('DOMContentLoaded', function () {
     tokenEl.addEventListener('blur', saveGhFromForm);
   }
 
-  // 同步设置的展开/收起状态记住，下次打开还是那样
+  // 同步设置的展开/收起状态记住，下次打开还是那样；默认收起
   const syncCard = document.getElementById('sync-card');
   if (syncCard) {
-    syncCard.open = readStore(KEY_SYNC_OPEN, true) !== false;
+    syncCard.open = readStore(KEY_SYNC_OPEN, false) === true;
     syncCard.addEventListener('toggle', function () {
       try { localStorage.setItem(KEY_SYNC_OPEN, JSON.stringify(syncCard.open)); } catch (e) {}
     });
