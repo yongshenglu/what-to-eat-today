@@ -327,6 +327,52 @@ body {
 .tool-row { display: flex; gap: 9px; flex-wrap: wrap; }
 .tool-row .btn { flex: 1; min-width: 100px; }
 
+/* ---------- GitHub 同步 ---------- */
+.sync-badge {
+  display: inline-flex; align-items: center; gap: 4px;
+  font-size: 12px; font-weight: 600;
+  padding: 3px 9px; border-radius: 999px;
+  cursor: pointer;
+  transition: background 0.2s, color 0.2s;
+}
+.sync-badge.idle    { background: rgba(140, 120, 100, 0.12); color: var(--text-2); }
+.sync-badge.ok      { background: rgba(47, 158, 68, 0.13);  color: var(--ok); }
+.sync-badge.busy    { background: var(--primary-soft);      color: var(--primary); }
+.sync-badge.pending { background: rgba(255, 149, 0, 0.15);  color: #B25E00; }
+.sync-badge.err     { background: rgba(214, 69, 69, 0.13);  color: var(--danger); }
+
+.sync-row { margin-bottom: 13px; }
+.sync-row label {
+  display: block; font-size: 12px; font-weight: 600;
+  color: var(--text-2); margin-bottom: 6px;
+}
+.sync-row input {
+  width: 100%;
+  border: 1.5px solid var(--sep); border-radius: var(--radius-sm);
+  padding: 12px 13px; font-size: 16px; font-family: inherit;
+  background: var(--bg); color: var(--text); outline: none;
+  transition: border-color 0.15s, background 0.15s;
+}
+.sync-row input:focus { border-color: var(--primary); background: var(--card); }
+
+.sync-help {
+  background: var(--bg); border-radius: var(--radius-sm);
+  padding: 14px 15px; margin-top: 14px;
+  font-size: 12.5px; color: var(--text-2); line-height: 1.85;
+}
+.sync-help b { color: var(--text); font-weight: 600; }
+.sync-help ol { margin: 8px 0 0 18px; }
+.sync-help li { margin-bottom: 4px; }
+.sync-help code {
+  background: var(--card); padding: 1px 6px; border-radius: 6px;
+  font-size: 11.5px; word-break: break-all;
+}
+.link-btn {
+  border: none; background: none; color: var(--primary);
+  font-size: inherit; font-family: inherit; cursor: pointer;
+  text-decoration: underline; padding: 0; font-weight: 600;
+}
+
 /* ---------- 记录页 ---------- */
 .records-header {
   display: flex; align-items: center; justify-content: space-between;
@@ -453,6 +499,7 @@ body {
     <div class="date">
       <span id="today-label"></span>
       <span class="badge" id="dish-count-badge">0 道菜</span>
+      <span class="sync-badge idle" id="sync-badge" onclick="jumpToSync()">☁️ 未开启</span>
     </div>
   </header>
 
@@ -518,6 +565,51 @@ body {
         <button class="btn btn-ghost" onclick="document.getElementById('import-file').click()">⬆️ 导入备份</button>
       </div>
       <input type="file" id="import-file" accept=".json,application/json" hidden onchange="handleImportFile(this.files[0]); this.value='';">
+    </div>
+
+    <div class="card" id="sync-card" style="margin-top:16px">
+      <div class="setting-label" style="margin-top:0">☁️ GitHub 同步</div>
+      <div class="sync-help" id="sync-status-line" style="margin:0 0 15px;background:var(--primary-soft)">
+        还没有开启同步。填好下面两项，菜谱就会自动存到你的 GitHub 仓库，换手机不丢。
+      </div>
+
+      <div class="sync-row">
+        <label for="gh-repo">仓库（写成 <code>用户名/仓库名</code>）</label>
+        <input id="gh-repo" placeholder="yongshenglu/meal-data" autocomplete="off" spellcheck="false">
+      </div>
+
+      <div class="sync-row">
+        <label for="gh-token">Token（只授权这一个仓库的 Contents 读写）</label>
+        <input id="gh-token" type="password" placeholder="github_pat_..." autocomplete="off" spellcheck="false">
+      </div>
+
+      <div class="tool-row">
+        <button class="btn btn-ghost" id="btn-sync-test" onclick="testConnection()">🔍 测试连接</button>
+        <button class="btn btn-primary" id="btn-sync-now" onclick="syncNow(true)">🔄 立即同步</button>
+      </div>
+      <div class="tool-row" style="margin-top:9px">
+        <button class="btn btn-danger-ghost" onclick="clearToken()">清除 Token</button>
+      </div>
+
+      <div class="sync-help">
+        <b>怎么开起来（只需做一次）</b>
+        <ol>
+          <li>打开 <button class="link-btn" onclick="window.open('https://github.com/settings/personal-access-tokens/new','_blank')">GitHub 创建 Token 页面</button>，需要先登录</li>
+          <li>名字随便填（比如 <code>今天吃什么</code>），有效期选 <code>No expiration</code> 或 <code>1 year</code></li>
+          <li><b>Repository access</b> 选 <b>Only select repositories</b>，然后只勾 <code>meal-data</code> 这一个</li>
+          <li>展开 <b>Permissions → Repository permissions</b>，把 <b>Contents</b> 改成 <b>Read and write</b>。<b>其余全部不要动</b></li>
+          <li>点 <b>Generate token</b>，把那串 <code>github_pat_</code> 开头的字符复制，粘到上面</li>
+          <li>点「<b>测试连接</b>」，看到 ✅ 就成了</li>
+        </ol>
+        <div style="margin-top:11px">
+          <b>安全说明</b>：Token 只存在<b>这台设备的浏览器里</b>，不进代码仓库，也不会写进「导出备份」的文件。
+          随时可在 <button class="link-btn" onclick="window.open('https://github.com/settings/personal-access-tokens','_blank')">GitHub Token 页面</button> 撤销。
+          填的时候只勾 <code>meal-data</code> 一个仓库，万一泄露也动不了你的其他仓库。
+        </div>
+        <div style="margin-top:11px">
+          <b>只同步菜谱</b>。吃过记录和随机设置只留在这台设备上，不会上传。
+        </div>
+      </div>
     </div>
 
   </section>
@@ -599,6 +691,9 @@ const SAMPLE_DISHES = [
 const KEY_DISHES = 'jctsm_dishes';
 const KEY_HISTORY = 'jctsm_history';
 const KEY_CONFIG = 'jctsm_config';
+const KEY_REMOVED = 'jctsm_removed';
+const KEY_GH = 'jctsm_gh';
+const KEY_DEVICE = 'jctsm_device';
 
 function readStore(key, fallback) {
   try {
@@ -614,6 +709,8 @@ function writeStore() {
     localStorage.setItem(KEY_DISHES, JSON.stringify(dishes));
     localStorage.setItem(KEY_HISTORY, JSON.stringify(history));
     localStorage.setItem(KEY_CONFIG, JSON.stringify(config));
+    localStorage.setItem(KEY_REMOVED, JSON.stringify(removed));
+    localStorage.setItem(KEY_GH, JSON.stringify(gh));
   } catch (e) {
     // 隐私模式 / 配额满 等情况，界面仍可使用，只是不持久化
   }
@@ -668,10 +765,37 @@ function normalizeHistory(list) {
 
 function clamp(n, lo, hi) { return Math.max(lo, Math.min(hi, n)); }
 
+/* 删除墓碑：记下被删掉的菜的 id，避免多设备同步时"删了又冒出来" */
+function normalizeRemoved(list) {
+  return (Array.isArray(list) ? list : [])
+    .filter(x => x && typeof x.id === 'string' && x.id && typeof x.at === 'string')
+    .map(x => ({ id: x.id, at: x.at }));
+}
+
+function normalizeGh(g) {
+  const src = (g && typeof g === 'object') ? g : {};
+  return {
+    token: typeof src.token === 'string' ? src.token.trim() : '',
+    repo: typeof src.repo === 'string' ? src.repo.trim() : '',
+    enabled: !!src.enabled
+  };
+}
+
+/* 墓碑太久的清掉，免得文件越长越大 */
+function pruneRemoved(list) {
+  const cutoff = Date.now() - 120 * 86400000;
+  return (list || []).filter(x => {
+    const t = new Date(x.at).getTime();
+    return isNaN(t) || t >= cutoff;
+  });
+}
+
 /* 状态 */
 let dishes = normalizeDishes(readStore(KEY_DISHES, []));
 let history = normalizeHistory(readStore(KEY_HISTORY, []));
 let config = normalizeConfig(readStore(KEY_CONFIG, null));
+let removed = normalizeRemoved(readStore(KEY_REMOVED, []));
+let gh = normalizeGh(readStore(KEY_GH, null));
 
 let currentMeal = null;
 let currentNotes = [];
@@ -679,6 +803,8 @@ let committed = false;
 let rollTimer = null;
 let toastTimer = null;
 let dishFilter = '全部';
+let syncState = { status: 'idle', lastAt: null, error: null, dirty: false };
+let pushTimer = null;
 
 /* =========================================================
    小工具
@@ -1109,6 +1235,7 @@ function addDish() {
   writeStore();
   input.value = '';
   renderAll();
+  schedulePush();
   toast('已添加「' + name + '」');
 }
 
@@ -1143,6 +1270,7 @@ function startEdit(id) {
     d.category = newCat;
     writeStore();
     renderAll();
+    schedulePush();
     toast('已保存');
   };
 
@@ -1163,8 +1291,12 @@ async function deleteDish(id) {
   if (currentMeal) {
     currentMeal = currentMeal.filter(m => m.id !== id);
   }
+  // 记下墓碑：否则另一台设备同步回来时，这道菜会复活
+  removed = removed.filter(r => r.id !== id);
+  removed.push({ id: id, at: new Date().toISOString() });
   writeStore();
   renderAll();
+  schedulePush();
   toast('已删除');
 }
 
@@ -1186,6 +1318,7 @@ async function loadSample() {
   dishes = dishes.concat(missing.map(m => ({ id: uid(), name: m.name, category: m.category })));
   writeStore();
   renderAll();
+  schedulePush();
   toast('已载入，现在有 ' + dishes.length + ' 道菜');
 }
 
@@ -1256,6 +1389,7 @@ function exportBackup() {
     version: 1,
     exportedAt: new Date().toISOString(),
     dishes: dishes,
+    removed: removed,
     history: history,
     config: config
   };
@@ -1308,16 +1442,13 @@ function handleImportFile(file) {
 
     if (mode === 'replace') {
       dishes = parsed;
+      removed = normalizeRemoved(incoming.removed);
       history = normalizeHistory(incoming.history);
       if (incoming.config) config = normalizeConfig(incoming.config);
     } else {
-      const seen = new Set(dishes.map(d => d.name + '|' + d.category));
-      parsed.forEach(d => {
-        const k = d.name + '|' + d.category;
-        if (seen.has(k)) return;
-        seen.add(k);
-        dishes.push(d);
-      });
+      const merged = mergeDishes(dishes, removed, parsed, normalizeRemoved(incoming.removed));
+      dishes = merged.dishes;
+      removed = merged.removed;
       if (Array.isArray(incoming.history)) {
         history = history.concat(normalizeHistory(incoming.history))
           .sort((a, b) => new Date(b.time) - new Date(a.time));
@@ -1326,9 +1457,334 @@ function handleImportFile(file) {
 
     writeStore();
     renderAll();
+    schedulePush();
     toast('导入成功，现在有 ' + dishes.length + ' 道菜');
   };
   reader.readAsText(file, 'utf-8');
+}
+
+/* =========================================================
+   GitHub 同步（只同步菜谱；吃过记录和设置留在本机）
+   ========================================================= */
+
+function b64encode(str) {
+  const bytes = new TextEncoder().encode(str);
+  let bin = '';
+  for (let i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
+  return btoa(bin);
+}
+
+function b64decode(b64) {
+  const bin = atob(String(b64).replace(/\s/g, ''));
+  const bytes = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+  return new TextDecoder().decode(bytes);
+}
+
+function parseRepo(s) {
+  const m = /^([A-Za-z0-9_.-]+)\/([A-Za-z0-9_.-]+)$/.exec((s || '').trim());
+  return m ? { owner: m[1], repo: m[2] } : null;
+}
+
+function deviceId() {
+  let id = readStore(KEY_DEVICE, null);
+  if (typeof id !== 'string' || !id) {
+    id = 'dev-' + uid();
+    try { localStorage.setItem(KEY_DEVICE, JSON.stringify(id)); } catch (e) {}
+  }
+  return id;
+}
+
+function relTime(iso) {
+  const diff = Date.now() - new Date(iso).getTime();
+  if (isNaN(diff) || diff < 0) return '刚刚';
+  const m = Math.floor(diff / 60000);
+  if (m < 1) return '刚刚';
+  if (m < 60) return m + ' 分钟前';
+  const h = Math.floor(m / 60);
+  if (h < 24) return h + ' 小时前';
+  return Math.floor(h / 24) + ' 天前';
+}
+
+/*
+  合并规则（两台设备各自改过也不会互相抹掉）：
+  1. 墓碑永远赢过存在 —— 删除的菜不会因为另一台设备还留着就复活
+  2. 两边新增的都保留
+  3. 同名同分类重复时保留 id 较小的那个（两边各加了同一道菜时收敛）
+  4. 结果按分类 + 菜名排序，保证输出稳定、不会白白产生提交
+*/
+function mergeDishes(localDishes, localRemoved, remoteDishes, remoteRemoved) {
+  const tomb = new Map();
+  [].concat(localRemoved || [], remoteRemoved || []).forEach(t => {
+    const prev = tomb.get(t.id);
+    if (!prev || t.at > prev.at) tomb.set(t.id, t);
+  });
+
+  const byId = new Map();
+  [].concat(localDishes || [], remoteDishes || []).forEach(d => {
+    if (!d || !d.id || tomb.has(d.id)) return;
+    if (!byId.has(d.id)) byId.set(d.id, d);
+  });
+
+  const byKey = new Map();
+  byId.forEach(d => {
+    const k = d.name + '|' + d.category;
+    const cur = byKey.get(k);
+    if (!cur || d.id < cur.id) byKey.set(k, d);
+  });
+
+  const catOrder = {};
+  CATS.forEach((c, i) => { catOrder[c.key] = i; });
+
+  const merged = Array.from(byKey.values()).sort((a, b) =>
+    ((catOrder[a.category] | 0) - (catOrder[b.category] | 0)) ||
+    a.name.localeCompare(b.name, 'zh')
+  );
+
+  return { dishes: merged, removed: Array.from(tomb.values()) };
+}
+
+function ghErrorMessage(status, data) {
+  const msg = (data && data.message) ? String(data.message) : '';
+  if (status === 401) return 'Token 无效或已过期，请重新生成一个';
+  if (status === 403) return 'Token 权限不够（Contents 需设为 Read and write）' + (msg ? '：' + msg : '');
+  if (status === 404) return '找不到仓库，或这个 Token 没有被授权访问它';
+  if (status === 409) return '仓库内容刚被改过，稍后会自动重试';
+  return '同步失败（' + status + '）' + (msg ? '：' + msg : '');
+}
+
+async function ghApi(path, opts) {
+  opts = opts || {};
+  const res = await fetch('https://api.github.com' + path, {
+    method: opts.method || 'GET',
+    headers: {
+      'Accept': 'application/vnd.github+json',
+      'X-GitHub-Api-Version': '2022-11-28',
+      'Authorization': 'Bearer ' + gh.token,
+      'Content-Type': 'application/json'
+    },
+    body: opts.body ? JSON.stringify(opts.body) : undefined
+  });
+  const text = await res.text();
+  let data = null;
+  try { data = text ? JSON.parse(text) : null; } catch (e) { data = null; }
+
+  if (!res.ok) {
+    const err = new Error(ghErrorMessage(res.status, data));
+    err.status = res.status;
+    throw err;
+  }
+  return data;
+}
+
+function syncPayload() {
+  return {
+    app: 'jctsm',
+    version: 1,
+    updatedAt: new Date().toISOString(),
+    deviceId: deviceId(),
+    dishes: dishes,
+    removed: pruneRemoved(removed)
+  };
+}
+
+/* 拉取 → 合并 → 有变化才写回。一次调用搞定一次完整的同步 */
+async function syncNow(showToast) {
+  if (!gh.token || !gh.repo) {
+    if (showToast) toast('先填好仓库和 Token');
+    return false;
+  }
+  const m = parseRepo(gh.repo);
+  if (!m) {
+    setSync('err', '仓库名要写成「用户名/仓库名」');
+    if (showToast) toast('仓库名格式不对');
+    return false;
+  }
+
+  clearTimeout(pushTimer);
+  pushTimer = null;
+  setSync('busy');
+
+  try {
+    // 1. 取远端
+    let remote = null;
+    let sha = null;
+    try {
+      const f = await ghApi('/repos/' + m.owner + '/' + m.repo + '/contents/meal-data.json');
+      if (f && f.content) {
+        const parsed = JSON.parse(b64decode(f.content));
+        remote = {
+          dishes: normalizeDishes(parsed.dishes),
+          removed: normalizeRemoved(parsed.removed)
+        };
+        sha = f.sha;
+      }
+    } catch (e) {
+      if (e.status !== 404) throw e;   // 404 = 还没存过，当作空远端
+    }
+
+    // 2. 合并
+    const before = remote ? JSON.stringify({ d: remote.dishes, r: remote.removed }) : null;
+    const merged = mergeDishes(dishes, removed, remote ? remote.dishes : [], remote ? remote.removed : []);
+    const after = JSON.stringify({ d: merged.dishes, r: merged.removed });
+
+    dishes = merged.dishes;
+    removed = merged.removed;
+    writeStore();
+    renderAll();
+
+    // 3. 只在内容真变了才写回，避免产生一堆没意义的提交
+    if (before !== after) {
+      await ghApi('/repos/' + m.owner + '/' + m.repo + '/contents/meal-data.json', {
+        method: 'PUT',
+        body: {
+          message: 'sync: 菜谱更新至 ' + dishes.length + ' 道（' + deviceId() + '）',
+          content: b64encode(JSON.stringify(syncPayload(), null, 2)),
+          ...(sha ? { sha: sha } : {})
+        }
+      });
+    }
+
+    syncState.lastAt = new Date().toISOString();
+    setSync('ok');
+    if (showToast) toast('已同步，共 ' + dishes.length + ' 道菜');
+    return true;
+
+  } catch (e) {
+    setSync('err', e.message);
+    if (showToast) toast('同步失败：' + e.message);
+    return false;
+  }
+}
+
+/* 改动后 5 秒再推，避免每敲一下就产生一个提交 */
+function schedulePush() {
+  if (!gh.token || !gh.repo) return;
+  syncState.dirty = true;
+  renderSync();
+  clearTimeout(pushTimer);
+  pushTimer = setTimeout(function () { syncNow(false); }, 5000);
+}
+
+function setSync(status, message) {
+  syncState.status = status;
+  if (message !== undefined) syncState.error = message;
+  if (status === 'ok') { syncState.error = null; syncState.dirty = false; }
+  if (status === 'busy') syncState.error = null;
+  renderSync();
+}
+
+function renderSync() {
+  const badge = document.getElementById('sync-badge');
+  if (!badge) return;
+
+  const configured = !!(gh.token && gh.repo);
+  let cls = 'idle', text = '☁️ 未开启';
+
+  if (!configured) {
+    cls = 'idle'; text = '☁️ 未开启';
+  } else if (syncState.status === 'busy') {
+    cls = 'busy'; text = '🔄 同步中';
+  } else if (syncState.status === 'err') {
+    cls = 'err'; text = '⚠️ 同步失败';
+  } else if (syncState.dirty) {
+    cls = 'pending'; text = '⏳ 待同步';
+  } else if (syncState.status === 'ok') {
+    cls = 'ok'; text = '✅ 已同步';
+  } else {
+    cls = 'idle'; text = '☁️ 待同步';
+  }
+
+  badge.className = 'sync-badge ' + cls;
+  badge.textContent = text;
+
+  const line = document.getElementById('sync-status-line');
+  if (line) {
+    let s = '还没有开启同步。填好下面两项，菜谱就会自动存到你的 GitHub 仓库，换手机不丢。';
+    if (configured) {
+      if (syncState.status === 'busy') {
+        s = '🔄 正在和 GitHub 交换数据…';
+      } else if (syncState.status === 'err') {
+        s = '⚠️ ' + esc(syncState.error || '同步失败') + '<br>本地改动没有丢，网络恢复后会自动重试。';
+      } else if (syncState.dirty) {
+        s = '⏳ 有改动还没存到 GitHub，几秒后自动同步。';
+      } else if (syncState.lastAt) {
+        s = '✅ 已同步到 <code>' + esc(gh.repo) + '</code> · 共 ' + dishes.length + ' 道菜 · ' + relTime(syncState.lastAt);
+      } else {
+        s = '已配置完成，点「立即同步」做第一次备份。';
+      }
+    }
+    line.innerHTML = s;
+    line.style.background = (configured && syncState.status === 'err')
+      ? 'rgba(214,69,69,0.10)' : 'var(--primary-soft)';
+  }
+
+  const bTest = document.getElementById('btn-sync-test');
+  const bNow = document.getElementById('btn-sync-now');
+  if (bTest) bTest.disabled = !configured || syncState.status === 'busy';
+  if (bNow) bNow.disabled = !configured || syncState.status === 'busy';
+}
+
+function saveGhFromForm() {
+  const repoEl = document.getElementById('gh-repo');
+  const tokenEl = document.getElementById('gh-token');
+  if (!repoEl || !tokenEl) return;
+  const repo = repoEl.value.trim();
+  const token = tokenEl.value.trim();
+  const changed = repo !== gh.repo || token !== gh.token;
+  gh.repo = repo;
+  gh.token = token;
+  gh.enabled = !!(repo && token);
+  try { localStorage.setItem(KEY_GH, JSON.stringify(gh)); } catch (e) {}
+  if (changed) {
+    syncState.lastAt = null;
+    schedulePush();
+  }
+  renderSync();
+}
+
+async function testConnection() {
+  saveGhFromForm();
+  const m = parseRepo(gh.repo);
+  if (!gh.token || !m) {
+    toast('请先填好「用户名/仓库名」和 Token');
+    return;
+  }
+  setSync('busy');
+  try {
+    const r = await ghApi('/repos/' + m.owner + '/' + m.repo);
+    setSync('idle');
+    toast('✅ 连接成功：' + r.full_name + (r.private ? '（私有）' : '（⚠️ 公开）'));
+    syncNow(false);
+  } catch (e) {
+    setSync('err', e.message);
+    toast('❌ ' + e.message);
+  }
+}
+
+async function clearToken() {
+  const ok = await confirmBox(
+    '清除 Token',
+    '清除后这台设备就不再自动同步了。<br>菜谱仍留在本地，不会删掉。',
+    '清除'
+  );
+  if (!ok) return;
+  gh.token = '';
+  gh.enabled = false;
+  try { localStorage.setItem(KEY_GH, JSON.stringify(gh)); } catch (e) {}
+  const el = document.getElementById('gh-token');
+  if (el) el.value = '';
+  syncState = { status: 'idle', lastAt: null, error: null, dirty: false };
+  renderSync();
+  toast('Token 已清除');
+}
+
+function jumpToSync() {
+  switchTab('dishes');
+  const el = document.getElementById('sync-card');
+  if (el) setTimeout(function () {
+    el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }, 80);
 }
 
 /* =========================================================
@@ -1361,6 +1817,7 @@ function renderAll() {
   renderDishList();
   renderHistory();
   renderMeal();
+  renderSync();
   ensureMeal();
 }
 
@@ -1379,7 +1836,26 @@ document.addEventListener('DOMContentLoaded', function () {
     if (e.key === 'Enter') addDish();
   });
 
+  // 把已保存的同步配置填回表单
+  const repoEl = document.getElementById('gh-repo');
+  const tokenEl = document.getElementById('gh-token');
+  if (repoEl) {
+    repoEl.value = gh.repo;
+    repoEl.addEventListener('change', saveGhFromForm);
+    repoEl.addEventListener('blur', saveGhFromForm);
+  }
+  if (tokenEl) {
+    tokenEl.value = gh.token;
+    tokenEl.addEventListener('change', saveGhFromForm);
+    tokenEl.addEventListener('blur', saveGhFromForm);
+  }
+
   renderAll();
+
+  // 打开时自动拉一次，把别的设备上的改动并进来
+  if (gh.token && gh.repo) {
+    setTimeout(function () { syncNow(false); }, 300);
+  }
 });
 </script>
 
