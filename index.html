@@ -180,6 +180,10 @@ body {
   content: '›'; color: var(--text-3); font-size: 20px;
   transition: transform 0.2s;
 }
+.settings summary .summary-main {
+  display: flex; align-items: center; gap: 10px;
+  flex: 1; min-width: 0;
+}
 .settings[open] summary::after { transform: rotate(90deg); }
 .settings-body { padding: 4px 17px 18px; border-top: 1px solid var(--sep); }
 
@@ -566,8 +570,14 @@ body {
       <input type="file" id="import-file" accept=".json,application/json" hidden onchange="handleImportFile(this.files[0]); this.value='';">
     </div>
 
-    <div class="card" id="sync-card" style="margin-top:16px">
-      <div class="setting-label" style="margin-top:0">☁️ GitHub 同步</div>
+    <details class="settings" id="sync-card" style="margin-top:16px">
+      <summary>
+        <span class="summary-main">
+          <span>☁️ GitHub 同步</span>
+          <span class="sync-badge idle">☁️ 未开启</span>
+        </span>
+      </summary>
+      <div class="settings-body">
       <div class="sync-help" id="sync-status-line" style="margin:0 0 15px;background:var(--primary-soft)">
         还没有开启同步。填好下面两项，菜谱就会自动存到你的 GitHub 仓库，换手机不丢。
       </div>
@@ -610,6 +620,7 @@ body {
         </div>
       </div>
     </div>
+    </details>
 
   </section>
 
@@ -687,6 +698,7 @@ const KEY_CONFIG = 'jctsm_config';
 const KEY_REMOVED = 'jctsm_removed';
 const KEY_GH = 'jctsm_gh';
 const KEY_DEVICE = 'jctsm_device';
+const KEY_SYNC_OPEN = 'jctsm_sync_open';
 
 /* 私有数据仓库的默认值，直接预填进同步设置，省得每次手打 */
 const DEFAULT_GH_REPO = 'yongshenglu/meal-data';
@@ -1652,8 +1664,8 @@ function setSync(status, message) {
 }
 
 function renderSync() {
-  const badge = document.getElementById('sync-badge');
-  if (!badge) return;
+  const badges = document.querySelectorAll('.sync-badge');
+  if (!badges.length) return;
 
   const configured = !!(gh.token && gh.repo);
   let cls = 'idle', text = '☁️ 未开启';
@@ -1672,8 +1684,10 @@ function renderSync() {
     cls = 'idle'; text = '☁️ 待同步';
   }
 
-  badge.className = 'sync-badge ' + cls;
-  badge.textContent = text;
+  badges.forEach(function (el) {
+    el.className = 'sync-badge ' + cls;
+    el.textContent = text;
+  });
 
   const line = document.getElementById('sync-status-line');
   if (line) {
@@ -1759,9 +1773,17 @@ async function clearToken() {
 function jumpToSync() {
   switchTab('dishes');
   const el = document.getElementById('sync-card');
-  if (el) setTimeout(function () {
+  if (!el) return;
+  setSyncOpen(true);
+  setTimeout(function () {
     el.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }, 80);
+}
+
+function setSyncOpen(open) {
+  const el = document.getElementById('sync-card');
+  if (el) el.open = !!open;
+  try { localStorage.setItem(KEY_SYNC_OPEN, JSON.stringify(!!open)); } catch (e) {}
 }
 
 /* =========================================================
@@ -1845,6 +1867,15 @@ document.addEventListener('DOMContentLoaded', function () {
     tokenEl.value = gh.token;
     tokenEl.addEventListener('change', saveGhFromForm);
     tokenEl.addEventListener('blur', saveGhFromForm);
+  }
+
+  // 同步设置的展开/收起状态记住，下次打开还是那样
+  const syncCard = document.getElementById('sync-card');
+  if (syncCard) {
+    syncCard.open = readStore(KEY_SYNC_OPEN, true) !== false;
+    syncCard.addEventListener('toggle', function () {
+      try { localStorage.setItem(KEY_SYNC_OPEN, JSON.stringify(syncCard.open)); } catch (e) {}
+    });
   }
 
   renderAll();
