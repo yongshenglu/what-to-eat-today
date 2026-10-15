@@ -698,7 +698,8 @@ const KEY_CONFIG = 'jctsm_config';
 const KEY_REMOVED = 'jctsm_removed';
 const KEY_GH = 'jctsm_gh';
 const KEY_DEVICE = 'jctsm_device';
-const KEY_SYNC_OPEN = 'jctsm_sync_open';
+/* 换过键名：旧的 jctsm_sync_open 被加载时的误写污染过，弃用 */
+const KEY_SYNC_OPEN = 'jctsm_sync_expanded';
 
 /* 私有数据仓库的默认值，直接预填进同步设置，省得每次手打 */
 const DEFAULT_GH_REPO = 'yongshenglu/meal-data';
@@ -1869,10 +1870,14 @@ document.addEventListener('DOMContentLoaded', function () {
     tokenEl.addEventListener('blur', saveGhFromForm);
   }
 
-  // 同步设置的展开/收起状态记住，下次打开还是那样；默认收起
+  // 同步设置默认收起；只有用户自己点过才记住展开/收起。
+  // 关键：状态真变了才去写 .open。页面加载时无脑赋值会触发 toggle，
+  // 把默认值当成用户偏好存下来（旧版本就是这样被写成"始终展开"的）。
   const syncCard = document.getElementById('sync-card');
   if (syncCard) {
-    syncCard.open = readStore(KEY_SYNC_OPEN, false) === true;
+    try { localStorage.removeItem('jctsm_sync_open'); } catch (e) {}   // 丢弃旧版本误写的偏好
+    const desired = readStore(KEY_SYNC_OPEN, false) === true;
+    if (syncCard.open !== desired) syncCard.open = desired;
     syncCard.addEventListener('toggle', function () {
       try { localStorage.setItem(KEY_SYNC_OPEN, JSON.stringify(syncCard.open)); } catch (e) {}
     });
