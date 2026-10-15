@@ -560,7 +560,6 @@ body {
 
     <div class="card" style="margin-top:16px">
       <div class="tool-row">
-        <button class="btn btn-ghost" onclick="loadSample()">📗 载入示例菜谱</button>
         <button class="btn btn-ghost" onclick="exportBackup()">⬇️ 导出备份</button>
         <button class="btn btn-ghost" onclick="document.getElementById('import-file').click()">⬆️ 导入备份</button>
       </div>
@@ -670,19 +669,6 @@ const PRESETS = {
   '标准': { '荤菜': 1, '素菜': 1, '汤': 1, '主食': 0, '凉菜': 0 },
   '丰盛': { '荤菜': 2, '素菜': 2, '汤': 1, '主食': 1, '凉菜': 0 }
 };
-
-const SAMPLE_DISHES = [
-  ['红烧排骨','荤菜'], ['可乐鸡翅','荤菜'], ['番茄炒蛋','荤菜'], ['鱼香肉丝','荤菜'],
-  ['宫保鸡丁','荤菜'], ['红烧肉','荤菜'], ['糖醋里脊','荤菜'], ['清蒸鲈鱼','荤菜'],
-  ['土豆炖牛肉','荤菜'], ['青椒肉丝','荤菜'], ['蒜蓉粉丝虾','荤菜'], ['啤酒鸭','荤菜'],
-  ['清炒西兰花','素菜'], ['手撕包菜','素菜'], ['地三鲜','素菜'], ['干煸豆角','素菜'],
-  ['蒜蓉菠菜','素菜'], ['香菇青菜','素菜'], ['醋溜土豆丝','素菜'], ['麻婆豆腐','素菜'],
-  ['蚝油生菜','素菜'], ['干锅花菜','素菜'],
-  ['紫菜蛋花汤','汤'], ['番茄蛋汤','汤'], ['冬瓜排骨汤','汤'], ['玉米排骨汤','汤'],
-  ['酸辣汤','汤'], ['西红柿豆腐汤','汤'],
-  ['米饭','主食'], ['蛋炒饭','主食'], ['番茄鸡蛋面','主食'], ['饺子','主食'], ['小米粥','主食'],
-  ['凉拌木耳','凉菜'], ['拍黄瓜','凉菜'], ['皮蛋豆腐','凉菜'], ['凉拌海带丝','凉菜'], ['老醋花生','凉菜']
-].map(p => ({ name: p[0], category: p[1] }));
 
 /* =========================================================
    存储
@@ -808,6 +794,8 @@ let toastTimer = null;
 let dishFilter = '全部';
 let syncState = { status: 'idle', lastAt: null, error: null, dirty: false };
 let pushTimer = null;
+/* 生成当前这餐时的菜谱指纹：菜谱变了且这餐没配满，就自动重配一次 */
+let mealFingerprint = null;
 
 /* =========================================================
    小工具
@@ -973,8 +961,7 @@ function renderMeal() {
       big = '还没有菜谱';
       sub = '先去「🥘 我的菜谱」录入你会做的菜';
       actions =
-        '<button class="btn btn-primary" onclick="loadSample()">载入示例菜谱</button>' +
-        '<button class="btn btn-ghost" onclick="switchTab(\'dishes\')">去录入</button>';
+        '<button class="btn btn-primary" onclick="switchTab(\'dishes\')">去录入菜谱</button>';
     } else if (wanted === 0) {
       big = '每类的数量都是 0';
       sub = '去「⚙️ 随机设置」调一下餐量';
@@ -1021,6 +1008,7 @@ function updateActionButtons() {
 
 function rollThenRender() {
   if (rollTimer) { clearInterval(rollTimer); rollTimer = null; }
+  mealFingerprint = dishFingerprint();
 
   if (!dishes.length) {
     currentMeal = null;
@@ -1184,7 +1172,6 @@ function renderDishList() {
         '<div class="empty-emoji">🥘</div>' +
         '<div class="big">菜谱是空的</div>' +
         '<div>在上面输入你会做的菜，点「添加」</div>' +
-        '<div class="empty-actions"><button class="btn btn-primary" onclick="loadSample()">载入示例菜谱</button></div>' +
       '</div>';
     return;
   }
@@ -1301,28 +1288,6 @@ async function deleteDish(id) {
   renderAll();
   schedulePush();
   toast('已删除');
-}
-
-async function loadSample() {
-  const missing = SAMPLE_DISHES.filter(s => !dishes.some(d => d.name === s.name && d.category === s.category));
-  if (!missing.length) {
-    toast('示例菜谱已经全部在里面了');
-    return;
-  }
-  if (dishes.length) {
-    const ok = await confirmBox(
-      '载入示例菜谱',
-      '会把 ' + missing.length + ' 道家常菜合并进现在的菜谱（已有的 ' + (SAMPLE_DISHES.length - missing.length) + ' 道会跳过）。',
-      '载入',
-      'primary'
-    );
-    if (!ok) return;
-  }
-  dishes = dishes.concat(missing.map(m => ({ id: uid(), name: m.name, category: m.category })));
-  writeStore();
-  renderAll();
-  schedulePush();
-  toast('已载入，现在有 ' + dishes.length + ' 道菜');
 }
 
 /* =========================================================
@@ -1824,12 +1789,31 @@ function renderAll() {
   ensureMeal();
 }
 
-/* 菜谱或设置变化后，如果当前还没有一餐，自动生成一次 */
+/* 菜谱或设置变化后，如果当前还没有一餐（或没配满且菜谱变多了），自动生成一次 */
 function ensureMeal() {
-  if (currentMeal && currentMeal.length) return;
   const wanted = CATS.reduce((s, c) => s + (config.combo[c.key] | 0), 0);
   if (!dishes.length || wanted === 0) return;
-  rollThenRender();
+
+  const pruned = pruneMeal();
+  const incomplete = !currentMeal || currentMeal.length < wanted;
+  const changed = dishFingerprint() !== mealFingerprint;
+
+  if (!currentMeal || !currentMeal.length || (incomplete && (changed || pruned))) {
+    rollThenRender();
+  }
+}
+
+/* 清掉这餐里已经不在菜谱中的菜（删除、导入覆盖等路径都会走到这里） */
+function pruneMeal() {
+  if (!currentMeal || !currentMeal.length) return false;
+  const ids = new Set(dishes.map(d => d.id));
+  const before = currentMeal.length;
+  currentMeal = currentMeal.filter(m => ids.has(m.id));
+  return currentMeal.length !== before;
+}
+
+function dishFingerprint() {
+  return dishes.map(d => d.id).sort().join(',');
 }
 
 /* 回车添加菜 */
