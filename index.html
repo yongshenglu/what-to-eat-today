@@ -559,8 +559,18 @@ body {
       </div>
     </div>
 
-    <div class="filter-chips" id="dish-filter"></div>
-    <div id="dish-list"></div>
+    <details class="settings" id="dish-list-card" style="margin-top:14px">
+      <summary>
+        <span class="summary-main">
+          <span>🥘 菜谱清单</span>
+          <span class="badge" id="dish-list-count">0 道</span>
+        </span>
+      </summary>
+      <div class="settings-body">
+        <div class="filter-chips" id="dish-filter"></div>
+        <div id="dish-list"></div>
+      </div>
+    </details>
 
     <div class="card" style="margin-top:16px">
       <div class="tool-row">
@@ -700,6 +710,7 @@ const KEY_GH = 'jctsm_gh';
 const KEY_DEVICE = 'jctsm_device';
 /* 换过键名：旧的 jctsm_sync_open 被加载时的误写污染过，弃用 */
 const KEY_SYNC_OPEN = 'jctsm_sync_expanded';
+const KEY_DISHLIST_OPEN = 'jctsm_dishes_expanded';
 
 /* 私有数据仓库的默认值，直接预填进同步设置，省得每次手打 */
 const DEFAULT_GH_REPO = 'yongshenglu/meal-data';
@@ -1787,6 +1798,20 @@ function setSyncOpen(open) {
   try { localStorage.setItem(KEY_SYNC_OPEN, JSON.stringify(!!open)); } catch (e) {}
 }
 
+/*
+  折叠面板的展开状态：默认收起，用户自己点过才记住。
+  关键：状态真变了才去写 .open。页面加载时无脑赋值会触发 toggle，
+  把默认值当成用户偏好存下来（旧版本就是这样被写成「始终展开」的）。
+*/
+function bindCollapsible(el, key) {
+  if (!el) return;
+  const desired = readStore(key, false) === true;
+  if (el.open !== desired) el.open = desired;
+  el.addEventListener('toggle', function () {
+    try { localStorage.setItem(key, JSON.stringify(el.open)); } catch (e) {}
+  });
+}
+
 /* =========================================================
    标签页 / 启动
    ========================================================= */
@@ -1807,6 +1832,8 @@ function renderHeader() {
   document.getElementById('today-label').textContent =
     (now.getMonth() + 1) + '月' + now.getDate() + '日 ' + week;
   document.getElementById('dish-count-badge').textContent = dishes.length + ' 道菜';
+  const listCount = document.getElementById('dish-list-count');
+  if (listCount) listCount.textContent = dishes.length + ' 道';
 }
 
 function renderAll() {
@@ -1870,18 +1897,10 @@ document.addEventListener('DOMContentLoaded', function () {
     tokenEl.addEventListener('blur', saveGhFromForm);
   }
 
-  // 同步设置默认收起；只有用户自己点过才记住展开/收起。
-  // 关键：状态真变了才去写 .open。页面加载时无脑赋值会触发 toggle，
-  // 把默认值当成用户偏好存下来（旧版本就是这样被写成"始终展开"的）。
-  const syncCard = document.getElementById('sync-card');
-  if (syncCard) {
-    try { localStorage.removeItem('jctsm_sync_open'); } catch (e) {}   // 丢弃旧版本误写的偏好
-    const desired = readStore(KEY_SYNC_OPEN, false) === true;
-    if (syncCard.open !== desired) syncCard.open = desired;
-    syncCard.addEventListener('toggle', function () {
-      try { localStorage.setItem(KEY_SYNC_OPEN, JSON.stringify(syncCard.open)); } catch (e) {}
-    });
-  }
+  // 折叠面板：默认收起，用户自己点过才记住
+  try { localStorage.removeItem('jctsm_sync_open'); } catch (e) {}   // 丢弃旧版本误写的偏好
+  bindCollapsible(document.getElementById('sync-card'), KEY_SYNC_OPEN);
+  bindCollapsible(document.getElementById('dish-list-card'), KEY_DISHLIST_OPEN);
 
   renderAll();
 
