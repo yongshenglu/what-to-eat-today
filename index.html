@@ -656,25 +656,24 @@ body {
 const CATS = [
   { key: '荤菜', icon: '🥩', color: '#D64545' },
   { key: '素菜', icon: '🥬', color: '#2F9E44' },
-  { key: '汤',   icon: '🍲', color: '#1971C2' },
-  { key: '主食', icon: '🍚', color: '#E8590C' }
+  { key: '汤',   icon: '🍲', color: '#1971C2' }
 ];
 const CAT_MAP = {};
 CATS.forEach(c => { CAT_MAP[c.key] = c; });
 
-/* 去掉过的分类，老数据归到哪儿（凉菜已移除，并入素菜） */
-const LEGACY_CATEGORY = { '凉菜': '素菜' };
+/* 去掉过的分类，老数据归到哪儿（凉菜、主食 已移除，并入素菜） */
+const LEGACY_CATEGORY = { '凉菜': '素菜', '主食': '素菜' };
 
 function mapCategory(raw) {
   const c = LEGACY_CATEGORY[raw] || raw;
   return CAT_MAP[c] ? c : '素菜';
 }
 
-const DEFAULT_COMBO = { '荤菜': 1, '素菜': 1, '汤': 1, '主食': 0 };
+const DEFAULT_COMBO = { '荤菜': 1, '素菜': 1, '汤': 1 };
 const PRESETS = {
-  '简单': { '荤菜': 1, '素菜': 1, '汤': 0, '主食': 0 },
-  '标准': { '荤菜': 1, '素菜': 1, '汤': 1, '主食': 0 },
-  '丰盛': { '荤菜': 2, '素菜': 2, '汤': 1, '主食': 1 }
+  '简单': { '荤菜': 1, '素菜': 1, '汤': 0 },
+  '标准': { '荤菜': 1, '素菜': 1, '汤': 1 },
+  '丰盛': { '荤菜': 2, '素菜': 2, '汤': 1 }
 };
 
 /* =========================================================
@@ -1248,7 +1247,7 @@ function addDish() {
     input.focus();
     return;
   }
-  const category = sel.value;
+  const category = mapCategory(sel.value);
   if (dishes.some(d => d.name === name && d.category === category)) {
     toast('这道菜已经在菜谱里了');
     return;
@@ -1283,7 +1282,7 @@ function startEdit(id) {
   const save = () => {
     const newName = nameInput.value.trim();
     if (!newName) { toast('菜名不能为空'); return; }
-    const newCat = row.querySelector('.edit-cat').value;
+    const newCat = mapCategory(row.querySelector('.edit-cat').value);
     if (dishes.some(x => x.id !== id && x.name === newName && x.category === newCat)) {
       toast('这道菜已经在菜谱里了');
       return;
