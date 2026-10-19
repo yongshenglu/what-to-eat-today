@@ -125,12 +125,19 @@
 
 ## 🧩 技术说明
 
-原生 HTML + CSS + JavaScript，**单文件、无框架、无构建步骤**。数据存在 `localStorage` 的三个键下：
+原生 HTML + CSS + JavaScript，**单文件、无框架、无构建步骤**。数据存在 `localStorage` 里：
 
 | 键 | 内容 |
 |---|---|
 | `jctsm_dishes` | 菜谱 `[{id, name, category}]` |
+| `jctsm_removed` | 删除墓碑 `[{id, at}]`，避免多设备同步时「删了又复活」 |
 | `jctsm_history` | 吃过记录 `[{time, dishes[]}]` |
 | `jctsm_config` | 设置 `{combo, avoidDays}` |
+| `jctsm_gh` | 同步配置 `{token, repo}`（Token 不进仓库、不进备份文件） |
+| `jctsm_cat_open` / `jctsm_sync_expanded` | 折叠面板的展开状态 |
 
 菜谱分类固定 3 种：**荤菜 / 素菜 / 汤**。（早先的「凉菜」「主食」已取消，老数据会并入「素菜」）
+
+## 📄 开源许可
+
+[MIT License](LICENSE) —— 可自由使用、修改、分发，保留版权声明即可。
